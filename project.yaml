@@ -1,0 +1,28 @@
+project:
+  name: hermes
+  tags:
+    - hermes
+
+services:
+  - hostname: vol
+    type: local-storage:single@1
+    verticalAutoscaling:
+      minDisk: 5
+
+  - hostname: hermes
+    type: python@3.11
+    minContainers: 1
+    maxContainers: 1
+    enableSubdomainAccess: true
+    verticalAutoscaling:
+      cpuMode: SHARED
+      minCpu: 1
+      maxCpu: 4
+      minRam: 0.5
+      maxRam: 2
+      minFreeRamGB: 0.25
+    envSecrets:
+      API_SERVER_KEY: <32-char-random-string>
+      RCLONE_CONFIG_R2_ENDPOINT: https://<r2 account id>.r2.cloudflarestorage.com
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: <r2 access key id>
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: <r2 secret access key>
