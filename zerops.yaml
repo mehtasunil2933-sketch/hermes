@@ -1,0 +1,61 @@
+zerops:
+  - setup: hermes
+
+    build:
+      base: python@3.11
+      os: ubuntu
+      buildCommands:
+        - echo "install happens in run.prepareCommands"
+      deployFiles: ./
+
+    run:
+      base: python@3.11
+      os: ubuntu
+
+      prepareCommands:
+        - sudo apt-get update
+        - sudo apt-get install -y curl xz-utils sqlite3 ripgrep ffmpeg rclone
+        - pip install --no-cache-dir "hermes-agent[messaging,daytona]==0.19.0"
+
+      volume:
+        hostname: vol
+        mountPath: /mnt/vol
+
+      envVariables:
+        HERMES_HOME: /mnt/vol/hermes
+        HERMES_WRITE_SAFE_ROOT: /mnt/vol/hermes
+        MALLOC_ARENA_MAX: "2"
+        PYTHONUNBUFFERED: "1"
+        RCLONE_CONFIG_R2_TYPE: s3
+        RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+        RCLONE_CONFIG_R2_REGION: auto
+        RCLONE_CONFIG_R2_ACL: private
+        R2_BUCKET: hermes-backup
+
+      initCommands:
+        - mkdir -p /mnt/vol/hermes /mnt/vol/backup
+        - touch /mnt/vol/hermes/.env && chmod 600 /mnt/vol/hermes/.env
+
+      start: hermes gateway run
+
+      ports:
+        - port: 8642
+          httpSupport: true
+
+      crontab:
+        - command: sqlite3 /mnt/vol/hermes/state.db ".backup /mnt/vol/backup/state.db"
+          timing: "30 * * * *"
+          allContainers: false
+
+        - command: >
+            set -e;
+            STAMP=$(date -u -I);
+            hermes backup -o /mnt/vol/backup/hermes-$STAMP.zip;
+            rclone copyto /mnt/vol/backup/hermes-$STAMP.zip
+            r2:$R2_BUCKET/hermes/hermes-$STAMP.zip;
+            rclone copyto /mnt/vol/backup/hermes-$STAMP.zip
+            r2:$R2_BUCKET/hermes/latest.zip;
+            find /mnt/vol/backup -name 'hermes-*.zip' -mtime +3 -delete;
+            rclone delete r2:$R2_BUCKET/hermes/ --min-age 30d --include 'hermes-*.zip'
+          timing: "45 3 * * *"
+          allContainers: false
