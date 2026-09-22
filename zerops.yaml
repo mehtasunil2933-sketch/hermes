@@ -25,6 +25,8 @@ zerops:
         HERMES_HOME: /mnt/vol/hermes
         HERMES_WRITE_SAFE_ROOT: /mnt/vol/hermes
         API_SERVER_HOST: 0.0.0.0
+        HERMES_DASHBOARD_BASIC_AUTH_USERNAME: sunil
+        HERMES_DASHBOARD_PUBLIC_URL: https://hermes-322d-9119.prg1.zerops.app
         MALLOC_ARENA_MAX: "2"
         PYTHONUNBUFFERED: "1"
         RCLONE_CONFIG_R2_TYPE: s3
@@ -37,11 +39,18 @@ zerops:
         - mkdir -p /mnt/vol/hermes /mnt/vol/backup
         - touch /mnt/vol/hermes/.env && chmod 600 /mnt/vol/hermes/.env
 
-      start: hermes gateway run
+      start: bash -c "hermes dashboard --host 0.0.0.0 --port 9119 & exec hermes gateway run"
 
       ports:
         - port: 8642
           httpSupport: true
+        - port: 9119
+          httpSupport: true
+
+      healthCheck:
+        httpGet:
+          port: 8642
+          path: /health
 
       crontab:
         - command: sqlite3 /mnt/vol/hermes/state.db ".backup /mnt/vol/backup/state.db"
