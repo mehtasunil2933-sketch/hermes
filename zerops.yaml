@@ -37,25 +37,9 @@ zerops:
       initCommands:
         - mkdir -p /mnt/vol/hermes/logs /mnt/vol/backup /mnt/vol/uv-python
         - touch /mnt/vol/hermes/.env && chmod 600 /mnt/vol/hermes/.env
-        # Install/repair Hermes on the volume. NEVER fails the deploy: output goes to the
-        # pipeline log AND /mnt/vol/hermes/logs/init-install.log so errors can be read.
-        - >
-          {
-          export HOME=/home/zerops USER=zerops SHELL=/bin/bash;
-          mkdir -p /home/zerops;
-          date -u;
-          if [ -f /mnt/vol/hermes/hermes-agent/.hermes-bootstrap-complete ] &&
-          /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes --version >/dev/null 2>&1;
-          then echo "hermes already installed";
-          else
-          curl -fsSL https://hermes-agent.nousresearch.com/install.sh -o /tmp/hermes-install.sh &&
-          bash /tmp/hermes-install.sh --skip-browser --skip-computer-use --non-interactive --verbose;
-          echo "INSTALLER EXIT CODE: $?";
-          fi;
-          /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes pm install
-          --extra messaging --extra daytona --without cua-driver --without agent-browser;
-          echo "PM INSTALL EXIT CODE: $?";
-          } 2>&1 | tee /mnt/vol/hermes/logs/init-install.log
+        # install/repair Hermes on the volume; script always exits 0 and logs to
+        # /mnt/vol/hermes/logs/init-install.log
+        - bash /var/www/hermes-init.sh || true
         - sudo ln -sf /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes /usr/local/bin/hermes
 
       # If Hermes isn't working, keep the container alive so the web terminal can be used to debug.
