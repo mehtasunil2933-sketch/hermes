@@ -5,7 +5,7 @@ zerops:
       base: python@3.11
       os: ubuntu
       buildCommands:
-        - echo "install happens in run.prepareCommands"
+        - echo "hermes is installed on the volume in run.initCommands"
       deployFiles: ./
 
     run:
@@ -14,8 +14,7 @@ zerops:
 
       prepareCommands:
         - sudo apt-get update
-        - sudo apt-get install -y curl xz-utils sqlite3 ripgrep ffmpeg rclone
-        - pip install --no-cache-dir "hermes-agent[messaging,daytona]==0.19.0"
+        - sudo apt-get install -y curl git xz-utils libatomic1 sqlite3 ripgrep ffmpeg rclone
 
       volume:
         hostname: vol
@@ -38,6 +37,11 @@ zerops:
       initCommands:
         - mkdir -p /mnt/vol/hermes /mnt/vol/backup
         - touch /mnt/vol/hermes/.env && chmod 600 /mnt/vol/hermes/.env
+        # install once onto the volume; later deploys skip this and keep your updated version
+        - >
+          [ -x /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes ] ||
+          (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser)
+        - sudo ln -sf /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes /usr/local/bin/hermes
 
       start: bash -c "hermes dashboard --host 0.0.0.0 --port 9119 & exec hermes gateway run"
 
