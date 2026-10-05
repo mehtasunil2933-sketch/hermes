@@ -23,9 +23,9 @@ zerops:
       envVariables:
         HERMES_HOME: /mnt/vol/hermes
         HERMES_WRITE_SAFE_ROOT: /mnt/vol/hermes
+        UV_PYTHON_INSTALL_DIR: /mnt/vol/uv-python
         API_SERVER_HOST: 0.0.0.0
         HERMES_DASHBOARD_BASIC_AUTH_USERNAME: sunil
-        HERMES_DASHBOARD_PUBLIC_URL: https://hermes-322d-9119.prg1.zerops.app
         MALLOC_ARENA_MAX: "2"
         PYTHONUNBUFFERED: "1"
         RCLONE_CONFIG_R2_TYPE: s3
@@ -35,12 +35,18 @@ zerops:
         R2_BUCKET: hermes-backup
 
       initCommands:
-        - mkdir -p /mnt/vol/hermes /mnt/vol/backup
+        - mkdir -p /mnt/vol/hermes /mnt/vol/backup /mnt/vol/uv-python
         - touch /mnt/vol/hermes/.env && chmod 600 /mnt/vol/hermes/.env
-        # install once onto the volume; later deploys skip this and keep your updated version
+        # install only if missing or broken; fresh installs also get messaging + daytona extras
         - >
-          [ -x /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes ] ||
-          (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-browser)
+          if [ -f /mnt/vol/hermes/hermes-agent/.hermes-bootstrap-complete ] &&
+          /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes --version >/dev/null 2>&1;
+          then echo "hermes already installed";
+          else curl -fsSL https://hermes-agent.nousresearch.com/install.sh |
+          bash -s -- --skip-browser --skip-computer-use --non-interactive --verbose &&
+          /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes pm install
+          --extra messaging --extra daytona --without cua-driver --without agent-browser;
+          fi
         - sudo ln -sf /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes /usr/local/bin/hermes
 
       start: bash -c "hermes dashboard --host 0.0.0.0 --port 9119 & exec hermes gateway run"
@@ -50,11 +56,6 @@ zerops:
           httpSupport: true
         - port: 9119
           httpSupport: true
-
-      healthCheck:
-        httpGet:
-          port: 8642
-          path: /health
 
       crontab:
         - command: sqlite3 /mnt/vol/hermes/state.db ".backup /mnt/vol/backup/state.db"
