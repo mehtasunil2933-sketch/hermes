@@ -38,7 +38,9 @@ zerops:
         - mkdir -p /mnt/vol/hermes /mnt/vol/backup /mnt/vol/uv-python
         - touch /mnt/vol/hermes/.env && chmod 600 /mnt/vol/hermes/.env
         # install only if missing or broken; fresh installs also get messaging + daytona extras
+        # Zerops runs initCommands without $HOME set; the installer needs it (set -u)
         - >
+          export HOME=/home/zerops;
           if [ -f /mnt/vol/hermes/hermes-agent/.hermes-bootstrap-complete ] &&
           /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes --version >/dev/null 2>&1;
           then echo "hermes already installed";
