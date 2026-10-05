@@ -28,8 +28,11 @@ fi
 
 if [ -x "$H" ]; then
   echo "--- adding extras (messaging, daytona)"
-  setsid "$H" pm install --extra messaging --extra daytona --without cua-driver --without agent-browser < /dev/null
-  echo "PM INSTALL EXIT CODE: $?"
+  # --extra and --without cannot be combined in one pm call
+  setsid "$H" pm install --extra messaging --extra daytona < /dev/null
+  echo "PM INSTALL (extras) EXIT CODE: $?"
+  setsid "$H" pm install --without cua-driver --without agent-browser < /dev/null
+  echo "PM INSTALL (without) EXIT CODE: $?"
 else
   echo "hermes binary missing at $H - skipping extras"
 fi
