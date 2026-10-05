@@ -35,23 +35,35 @@ zerops:
         R2_BUCKET: hermes-backup
 
       initCommands:
-        - mkdir -p /mnt/vol/hermes /mnt/vol/backup /mnt/vol/uv-python
+        - mkdir -p /mnt/vol/hermes/logs /mnt/vol/backup /mnt/vol/uv-python
         - touch /mnt/vol/hermes/.env && chmod 600 /mnt/vol/hermes/.env
-        # install only if missing or broken; fresh installs also get messaging + daytona extras
-        # Zerops runs initCommands without $HOME set; the installer needs it (set -u)
+        # Install/repair Hermes on the volume. NEVER fails the deploy: output goes to the
+        # pipeline log AND /mnt/vol/hermes/logs/init-install.log so errors can be read.
         - >
-          export HOME=/home/zerops;
+          {
+          export HOME=/home/zerops USER=zerops SHELL=/bin/bash;
+          mkdir -p /home/zerops;
+          date -u;
           if [ -f /mnt/vol/hermes/hermes-agent/.hermes-bootstrap-complete ] &&
           /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes --version >/dev/null 2>&1;
           then echo "hermes already installed";
-          else curl -fsSL https://hermes-agent.nousresearch.com/install.sh |
-          bash -s -- --skip-browser --skip-computer-use --non-interactive --verbose &&
+          else
+          curl -fsSL https://hermes-agent.nousresearch.com/install.sh -o /tmp/hermes-install.sh &&
+          bash /tmp/hermes-install.sh --skip-browser --skip-computer-use --non-interactive --verbose;
+          echo "INSTALLER EXIT CODE: $?";
+          fi;
           /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes pm install
           --extra messaging --extra daytona --without cua-driver --without agent-browser;
-          fi
+          echo "PM INSTALL EXIT CODE: $?";
+          } 2>&1 | tee /mnt/vol/hermes/logs/init-install.log
         - sudo ln -sf /mnt/vol/hermes/hermes-agent/.hermes/bin/hermes /usr/local/bin/hermes
 
-      start: bash -c "hermes dashboard --host 0.0.0.0 --port 9119 & exec hermes gateway run"
+      # If Hermes isn't working, keep the container alive so the web terminal can be used to debug.
+      start: >
+        bash -c 'if hermes --version >/dev/null 2>&1;
+        then hermes dashboard --host 0.0.0.0 --port 9119 & exec hermes gateway run;
+        else echo "hermes not runnable - see /mnt/vol/hermes/logs/init-install.log"; exec sleep infinity;
+        fi'
 
       ports:
         - port: 8642
